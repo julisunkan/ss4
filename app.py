@@ -70,6 +70,41 @@ def generate_code():
         logging.error(f"Error generating code: {str(e)}")
         return jsonify({'success': False, 'error': 'Failed to generate code'}), 500
 
+@app.route('/api/generate-bulk-codes', methods=['POST'])
+def generate_bulk_codes():
+    """Generate multiple one-time download codes"""
+    try:
+        data = request.get_json()
+        quantity = data.get('quantity', 1)
+        
+        # Validate quantity
+        if quantity < 1 or quantity > 100:
+            return jsonify({'success': False, 'error': 'Quantity must be between 1 and 100'}), 400
+        
+        # Generate codes
+        codes = []
+        expiry = datetime.utcnow() + timedelta(days=365)  # 1 year expiry
+        
+        for _ in range(quantity):
+            code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            download_code = DownloadCode(code=code, expires_at=expiry)
+            db.session.add(download_code)
+            codes.append({
+                'code': code,
+                'expires_at': expiry.isoformat()
+            })
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'codes': codes,
+            'expires_at': expiry.isoformat()
+        })
+    except Exception as e:
+        logging.error(f"Error generating bulk codes: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to generate codes'}), 500
+
 @app.route('/api/verify-code', methods=['POST'])
 def verify_code():
     """Verify and consume a download code"""
